@@ -8,6 +8,6 @@ name := "sample-app"
 scalaVersion := "2.11.1"
 
 libraryDependencies ++= Seq(
-  "com.whitepages" %% "scala-webservice" % "9.4.3",
+  "com.whitepages" %% "scala-webservice" % "9.4.10-SNAPSHOT",
   "org.scalatest" %% "scalatest" % "2.1.7" % "test"
 )
