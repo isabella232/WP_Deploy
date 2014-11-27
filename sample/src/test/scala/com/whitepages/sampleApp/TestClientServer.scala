@@ -1,4 +1,4 @@
-package com.whitepages.sampleSvc
+package com.whitepages.sampleApp
 
 import org.scalatest.{Matchers, BeforeAndAfterAll, FunSpec}
 import com.typesafe.config.ConfigFactory
@@ -33,14 +33,12 @@ class TestClientServer extends FunSpec with BeforeAndAfterAll
 
     it("should respond correctly") {
       val request = JsonObject(
-        "address1" -> "1301 5th ave",
-        "address2" -> "1600",
-        "location" -> "seattle, WA")
-      val request1 = JsonObject("request" -> request)
-      val f = client.postJson("testcmd", request1, RequestId())
+        "first" -> "John",
+        "last" -> "Smith")
+      val f = client.postJson("testcmd", request, RequestId())
       val response = Await.result(f, 10 seconds)
-      jget(response, "success", "zip") should equal("2625")
-      jget(response, "success", "county") should equal("King")
+      jget(response, "in", "last") should equal("Smith")
+      jget(response, "out") should equal("ok")
       log.info(noId, response)
     }
   }
