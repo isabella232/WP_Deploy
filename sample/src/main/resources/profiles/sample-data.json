@@ -1,0 +1,12 @@
+[
+    {
+        cmd: "testcmd",
+        request: {
+            request: {
+                address1: "1301 5th ave",
+                address2: "1600",
+                location: "seattle, WA"
+            }
+        }
+    }
+]

@@ -1,0 +1,39 @@
+{
+    test: {
+        kind: "rate",
+        time: [5, "seconds"],
+        count: 10,
+        init: 1000,
+        incr: 1000
+    },
+
+    service:"sample-svc",
+    client: "sample-svc",
+
+    graph: {
+        title: "Service Performance",
+        xlabel: "Requests per Second",
+
+        // following 2 arrays should have the same size: M
+        ylabels: ["Microseconds", "Max Queue", "Per Second"],
+        ysizes: [50, 25, 25],
+
+        // following 3 arrays should have the same size: N
+        labels: ["Client", "Server", "ClientQ", "ServerQ", "Requests"],
+        where: [0, 0, 1, 1, 2],    // values in range 0..M-1
+        fields: [
+            ["client", "hist", "latency", "mean"],
+            ["server", "hist", "server.latency.microsecs", "mean"],
+            ["client", "gauges", "maxQueue"],
+            ["server", "gauges", "server.maxQueue"],
+            ["client", "gauges", "count"]
+        ]
+    },
+
+    // following will contain test results
+    vals: null,
+
+    requests: {
+        "*": "sample-data"
+    }
+}
