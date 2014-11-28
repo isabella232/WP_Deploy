@@ -60,6 +60,7 @@ object Docker extends Plugin {
     val opt = dockerJavaOptions.value
     val base = dockerBase.value
     val main = maintainer.value
+    val dr = dockerRepo.value
     val p1 = p + 30000
     val scalaVer = scalaVersion.value
     val scalaVer2 = scalaVer.split("[.]").take(2).mkString(".")
@@ -70,7 +71,7 @@ object Docker extends Plugin {
     FileUtils.copyFileToDirectory(new File(s"target/scala-$scalaVer2/$n-assembly-$v.jar"), f1)
     val f: File = new File("target/docker/Dockerfile")
     val out = new PrintWriter(f)
-    out.println(s"FROM $dockerRepo/$base")
+    out.println(s"FROM $dr/$base")
     out.println(s"MAINTAINER $main")
     out.println(s"COPY files /opt/wp/$n")
     out.println(s"WORKDIR /opt/wp/$n")

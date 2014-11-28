@@ -1,4 +1,4 @@
-name := "sbt-plugins"
+name := "sbt-docker"
 
 // WARNING: The following line needed to be early in this file.
 
