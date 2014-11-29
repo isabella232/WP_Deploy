@@ -1,0 +1,5 @@
+#!/bin/bash
+
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+
+java -cp $DIR/../target/scala-2.11/service-deploy.jar com.whitepages.serviceDeploy.cmdHandler.Deploy "$@"
