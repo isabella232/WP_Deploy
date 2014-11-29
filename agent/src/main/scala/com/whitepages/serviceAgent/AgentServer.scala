@@ -24,13 +24,11 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
 
   case object Free
 
-  // TODO pass in repoName and registryName ???
-  private[this] val repoName = "search/"
-  private[this] val registryName = "scala-drepo0.qa59.pages"
-  private[this] val prefix = s"$registryName/$repoName"
+  private[this] val registryName =  config.getString("wp.service-agent.registry")
+  private[this] val useRegistry =  config.getBoolean("wp.service-agent.useRegistry")
   private[this] implicit val ec: ExecutionContext = context.dispatcher
   private[this] val docker = DockerClient("docker", this.context)
-  private[this] val repo = DockerClient("repo", this.context)
+  private[this] val repo = if (useRegistry) DockerClient("repo", this.context) else null
 
   // TODO stop docker and repo clients
 
@@ -45,7 +43,8 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
   log.info(noId, JsonObject("auth" -> authResponse))
   */
 
-  def trimRepo(s: String): String = {
+  def trimRepo(s: String, groupName: String): String = {
+    val prefix = s"$registryName/$groupName/"
     if (s.startsWith(prefix)) {
       s.replaceFirst(prefix, "")
     } else {
@@ -57,7 +56,7 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
     Compact(JsonObject("cmd" -> cmd, "response" -> r))
   }
 
-  def images(serviceName: String): Seq[JsonObject] = {
+  def images(serviceName: String, groupName: String): Seq[JsonObject] = {
     val imagesJson = docker.call("/images/json")
     val report0 = jgetArray(imagesJson) flatMap {
       case download =>
@@ -72,7 +71,7 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
     }
     val report = report0 filter {
       case item =>
-        trimRepo(jgetString(item, "fullService")) == serviceName
+        trimRepo(jgetString(item, "fullService"), groupName) == serviceName
     }
     val report1 = report map {
       case d => jgetObject(jdelete(d, "fullService"))
@@ -96,7 +95,7 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
     }
   }
 
-  def container(): Option[JsonObject] = {
+  def container(groupName: String): Option[JsonObject] = {
     val r1 = docker.call("/containers/json")
     //log.info(noId, r1)
     val containersJson = jgetArray(r1)
@@ -107,7 +106,7 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
       val image = jgetString(containerJson, "Image")
       val stat = jgetString(containerJson, "Status")
       val id = jgetString(containerJson, "Id")
-      val parts = trimRepo(jgetString(containerJson, "Image")).split(":")
+      val parts = trimRepo(jgetString(containerJson, "Image"), groupName).split(":")
       val j = Some(JsonObject("image" -> image, "version" -> parts(1),
         "status" -> stat, "id" -> id))
       j
@@ -131,10 +130,11 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
 
     def run(request: JsonObject): JsonObject = {
       val serviceName = jgetString(request, "service")
+      val groupName = jgetString(request, "group")
       val version = jgetString(request, "version")
       val hasLB = jgetBoolean(request, "hasLB")
       val select = jgetArray(request, "select") map (jgetString(_))
-      val imageName = s"$registryName/$repoName$serviceName:$version"
+      val imageName = s"$registryName/$groupName/$serviceName:$version"
 
       image(imageName) match {
         case None =>
@@ -160,7 +160,7 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
           }
 
           val env = Compact(JsonObject("agentHost" -> agentHost, "containerHost" -> svcHost,
-            "lifecyclePort" -> lifecyclePort, "configSelect"->select))
+            "lifecyclePort" -> lifecyclePort, "configSelect" -> select))
           val responsej = docker.call("/containers/create", body = Some(JsonObject("Image" -> imageName,
             "Env" -> JsonArray(s"serviceInfo=$env"))))
           val id = jgetString(responsej, "Id")
@@ -185,8 +185,8 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
       }
     }
 
-    def halt(clear: Boolean = true): JsonObject = {
-      container() match {
+    def halt(groupName: String, clear: Boolean = true): JsonObject = {
+      container(groupName) match {
         case None =>
           progress("no container currently running")
           emptyJsonObject
@@ -218,23 +218,33 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
     requestCmd match {
       case "versions" =>
         val serviceName = jgetString(request, "service")
-        val j = repo.call(s"/v1/repositories/search/$serviceName/tags")
-        val j1 = jgetObject(j) map {
-          case (k, v) => k
+        val groupName = jgetString(request, "group")
+        val j1 = if (useRegistry) {
+          val j = repo.call(s"/v1/repositories/$groupName/$serviceName/tags")
+          jgetObject(j) map {
+            case (k, v) => k
+          }
+        } else {
+          val i = images(serviceName, groupName)
+          i map {
+            case x => jgetString(x, "version")
+          }
         }
-        //log.info(noId, JsonObject("versions" -> j1))
+        //log.info(noId, JsonObject("versions" -> j1, "i"->i1))
         JsonObject("versions" -> j1.toSeq)
       case "downloads" =>
         val serviceName = jgetString(request, "service")
-        val imagesJson = images(serviceName)
+        val groupName = jgetString(request, "group")
+        val imagesJson = images(serviceName, groupName)
         JsonObject("images" -> imagesJson)
       case "download" =>
         log.info(noId, request)
         delay
         val serviceName = jgetString(request, "service")
+        val groupName = jgetString(request, "group")
         val version = jgetString(request, "request", "version")
-        val image = s"$registryName/$repoName$serviceName"
-        val report = images(serviceName)
+        val image = s"$registryName/$groupName/$serviceName"
+        val report = images(serviceName, groupName)
         val matches = report filter {
           case item => jget(item, "version") == version
         }
@@ -252,14 +262,15 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
       case "status" =>
         delay
         val serviceName = jgetString(request, "service")
+        val groupName = jgetString(request, "group")
         val state = StateFile.get(serviceName)
         val hasLb = jgetBoolean(state, "hasLB")
-        val lb:String = if (! hasLb) {
+        val lb: String = if (!hasLb) {
           "none"
         } else {
           LoadBalancer.status(serviceName)
         }
-        val result = container() match {
+        val result = container(groupName) match {
           case Some(containerJson) =>
             //log.info(noId, containerJson)
             val response = JsonObject("status" -> jgetString(containerJson, "status"),
@@ -278,11 +289,13 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
       case "deploy" =>
         log.info(noId, request)
         delay
+        val groupName = jgetString(request, "group")
         //("deploy", "test")
         val newVersion = jgetString(request, "request", "version")
-        val info = JsonObject("service" -> jgetString(request, "service"), "version" -> newVersion,
+        val info = JsonObject("service" -> jgetString(request, "service"), "group"->groupName,
+          "version" -> newVersion,
           "hasLB" -> jgetBoolean(request, "request", "hasLB"), "select" -> jgetArray(request, "request", "select"))
-        container() match {
+        container(groupName) match {
           case Some(containerJson) =>
             val oldVersion = jgetString(containerJson, "version")
             if (oldVersion == newVersion) {
@@ -290,7 +303,7 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
               emptyJsonObject
             } else {
               // TODO download if not present
-              halt()
+              halt(groupName)
               run(info)
             }
           case None =>
@@ -300,16 +313,18 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
       case "halt" =>
         log.info(noId, request)
         delay
-        halt()
+        val groupName = jgetString(request, "group")
+        halt(groupName)
       case "bounce" =>
         log.info(noId, request)
         delay
+        val groupName = jgetString(request, "group")
         val (name, info) = StateFile.getFirst(Some(reportProgress))
         if (name == "") {
           progress("nothing running")
           emptyJsonObject
         } else {
-          halt(clear = false)
+          halt(groupName, clear = false)
           run(jgetObject(info))
           emptyJsonObject
         }
@@ -347,8 +362,11 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
           if (busyRequest) busy = requestCmd
           val fcmd = Future {
             val v = doCmd(sender1, requestCmd, jgetObject(j), report)
-            if (busyRequest) self ! Free
+            //if (busyRequest) self ! Free
             v
+          }
+          fcmd.onComplete {
+            case x => if (busyRequest) self ! Free
           }
           fcmd
         }
