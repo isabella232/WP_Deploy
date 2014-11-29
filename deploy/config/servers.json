@@ -1,19 +1,16 @@
 {
     services:[
-        {service:"scala-docker",stacks:[
+        {service:"sample-app",stacks:[
             {stack:"local",lb:false, select:["all"], servers:[
                 {server:"*"}
             ]},
-            {stack:"qa59",lb:true,select:["all", "qa","qa59"],servers:[
-                {server:"scala-docker0.qa59.pages"},
-                {server:"scala-docker1.qa59.pages"},
-                {server:"scala-docker2.qa59.pages"}
-            ]},
-            {stack:"openstack",lb:false,select:{},servers:[
-               {server:"10.64.2.102"}
+            {stack:"qa",lb:true,select:["all", "qa"],servers:[
+                {server:"scala-docker0.qa.foo.com"},
+                {server:"scala-docker1.qa.foo.com"},
+                {server:"scala-docker2.qa.foo.com"}
             ]}
         ]},
-        {service:"asc-svc",stacks:[]},
-        {service:"cass-svc",stacks:[]}
+        {service:"aaa-svc",stacks:[]},
+        {service:"bbb-svc",stacks:[]}
     ]
 }
