@@ -227,7 +227,6 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
           }
         } else {
           val i = images(serviceName, groupName)
-	  log.info(noId, i)
           i map {
             case x => jgetString(x, "version")
           }
