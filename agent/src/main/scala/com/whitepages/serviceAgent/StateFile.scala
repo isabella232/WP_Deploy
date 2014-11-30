@@ -9,17 +9,9 @@ import scala.concurrent.Await
 import scala.language.postfixOps
 import com.whitepages.framework.logging.noId
 
-/**
- * This a test of list blocks
- *
- * - foo
- * - bar
- *
- * Thats all!
- */
 object StateFile extends ClassSupport {
 
-  private[this] val fileName = "/opt/wp/service-agent/agent.json"
+  private[this] val fileName = config.getString("wp.service-agent.stateFile")
   private[this] val f = File(fileName)
 
   private def read(reportProgress:Option[(Progress)=>Unit]= None): JsonObject = {
