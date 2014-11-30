@@ -6,6 +6,14 @@ name := "sample-app"
 
 scalaVersion := "2.11.1"
 
+buildInfoSettings
+
+sourceGenerators in Compile <+= buildInfo
+
+buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, javaSource, organization)
+
+buildInfoPackage := "com.whitepages.info." + (name.value.replace("-", "_"))
+
 sbtassembly.Plugin.assemblySettings
 
 dockerSettings
