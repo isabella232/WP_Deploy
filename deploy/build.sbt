@@ -7,13 +7,9 @@ name := "service-agent"
 
 organization := "com.whitepages"
 
-//repo := "search-dev"
-
 scalaVersion := "2.11.1"
 
-crossScalaVersions := Seq("2.11.1")   // sbt-release bug!
-
-//wpSettings
+assemblySettings
 
 jarName in assembly := "service-deploy.jar"
 

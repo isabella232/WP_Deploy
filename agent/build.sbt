@@ -18,8 +18,7 @@ buildInfoKeys := Seq[BuildInfoKey](name, version, scalaVersion, sbtVersion, java
 buildInfoPackage := "com.whitepages.info." + (name.value.replace("-", "_"))
 
 libraryDependencies ++= Seq(
-  "com.whitepages" %% "scala-webservice" % "9.4.10-SNAPSHOT",
-  "com.typesafe.akka" %% "akka-remote" % "2.3.2"
+  "com.whitepages" %% "scala-webservice" % "9.4.10-SNAPSHOT"
 )
 
 

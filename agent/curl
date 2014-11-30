@@ -1,0 +1,2 @@
+curl --insecure --cert ~/.boot2docker/certs/boot2docker-vm/cert.pem --key ~/.boot2docker/certs/boot2docker-vm/key.pem https://192.168.59.103:2376/images/json
+

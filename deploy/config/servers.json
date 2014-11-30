@@ -1,6 +1,6 @@
 {
     services:[
-        {service:"sample-app",stacks:[
+        {service:"sample-app",group:"test",stacks:[
             {stack:"local",lb:false, select:["all"], servers:[
                 {server:"*"}
             ]},

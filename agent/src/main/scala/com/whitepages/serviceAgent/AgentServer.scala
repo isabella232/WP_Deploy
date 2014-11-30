@@ -217,6 +217,7 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
 
     requestCmd match {
       case "versions" =>
+        log.info(noId, request)
         val serviceName = jgetString(request, "service")
         val groupName = jgetString(request, "group")
         val j1 = if (useRegistry) {
@@ -226,6 +227,7 @@ class AgentServer(agentHost: String, svcHost: String, lcActor: ActorRef) extends
           }
         } else {
           val i = images(serviceName, groupName)
+	  log.info(noId, i)
           i map {
             case x => jgetString(x, "version")
           }
