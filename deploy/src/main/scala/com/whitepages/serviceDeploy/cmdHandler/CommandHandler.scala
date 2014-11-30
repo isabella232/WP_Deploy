@@ -36,8 +36,8 @@ case class CommandHandler(factory: ActorRefFactory, localHost: String, servicesI
 
   private def getVersions(): Seq[String] = {
     versions = findServers match {
-      case Some((serviceName, stackName, serverNames)) =>
-        val coord = Coordinator(factory, serviceName, localHost, serverNames, Some(progress))
+      case Some((serviceName, groupName, stackName, serverNames)) =>
+        val coord = Coordinator(factory, serviceName, groupName, localHost, serverNames, Some(progress))
         val allVers = coord.fromFirst("versions")
         val (host, vers) = allVers.head
         val v = jgetArray(vers, "versions").map(jgetString(_))
@@ -194,6 +194,10 @@ case class CommandHandler(factory: ActorRefFactory, localHost: String, servicesI
           getService(newService) match {
             case Some(s) =>
               service = Some(newService)
+              val g = jgetString(s, "group")
+              val g1 = if (g == "") "search" else g
+              println(s"group:$g1")
+              group = Some(g1)
               //getVersions(factory, localHost, servicesInfo)
               stack = None
               server = None
@@ -212,16 +216,16 @@ case class CommandHandler(factory: ActorRefFactory, localHost: String, servicesI
         printGrid(header ++ lines)
       } else if (cmd == "stacks") {
         findService match {
-          case Some(s) =>
-            (getStacks(s) match {
+          case Some((serviceName,groupName)) =>
+            (getStacks(serviceName)) match {
               case Some(ss) =>
                 val grid = JsonArray("STACK") +:
                   (ss map {
                     case j => JsonArray(j)
                   })
                 printGrid(grid)
-              case None => println("no such service: " + s)
-            })
+              case None => println("no such service: " + serviceName)
+            }
           case None =>
         }
       } else if (cmd == "stack") {
@@ -229,7 +233,7 @@ case class CommandHandler(factory: ActorRefFactory, localHost: String, servicesI
         if (args.size >= 2) {
           val newStack = args(1)
           findService match {
-            case Some(serviceName) =>
+            case Some((serviceName,groupName)) =>
               getStack(serviceName, newStack) match {
                 case Some(j) =>
                   stack = Some(newStack)
@@ -245,7 +249,7 @@ case class CommandHandler(factory: ActorRefFactory, localHost: String, servicesI
         }
       } else if (cmd == "servers") {
         findStack match {
-          case Some((serviceName, stackName)) =>
+          case Some((serviceName, groupName, stackName)) =>
             getServers(serviceName, stackName) match {
               case Some(ss) =>
                 val grid = JsonArray("SERVERS") +:
@@ -261,7 +265,7 @@ case class CommandHandler(factory: ActorRefFactory, localHost: String, servicesI
         if (args.size >= 2) {
           val newServer = args(1)
           findStack match {
-            case Some((serviceName, stackName)) =>
+            case Some((serviceName, groupName, stackName)) =>
               getServer(serviceName, stackName, newServer) match {
                 case Some(s) =>
                   server = Some(newServer)
@@ -275,8 +279,8 @@ case class CommandHandler(factory: ActorRefFactory, localHost: String, servicesI
         }
       } else if (cmd == "downloads") {
         findServers match {
-          case Some((serviceName, stackName, serverNames)) =>
-            val coord = Coordinator(factory, serviceName, localHost, serverNames, Some(progress))
+          case Some((serviceName, groupName, stackName, serverNames)) =>
+            val coord = Coordinator(factory, serviceName, groupName, localHost, serverNames, Some(progress))
             val info = coord.fromAll("downloads")
             coord.close
             val report = info flatMap {
@@ -303,9 +307,9 @@ case class CommandHandler(factory: ActorRefFactory, localHost: String, servicesI
           val version = args(1)
           // TODO check version is legal??
           findServers match {
-            case Some((serviceName, stackName, serverNames)) =>
+            case Some((serviceName, groupName, stackName, serverNames)) =>
               println("")
-              val coord = Coordinator(factory, serviceName, localHost, serverNames, Some(progress))
+              val coord = Coordinator(factory, serviceName, groupName, localHost, serverNames, Some(progress))
               coord.download(serviceName, version)
               coord.close
               println("")
@@ -316,8 +320,8 @@ case class CommandHandler(factory: ActorRefFactory, localHost: String, servicesI
         }
       } else if (cmd == "status") {
         findServers match {
-          case Some((serviceName, stackName, serverNames)) =>
-            val coord = Coordinator(factory, serviceName, localHost, serverNames, Some(progress))
+          case Some((serviceName, groupName, stackName, serverNames)) =>
+            val coord = Coordinator(factory, serviceName, groupName, localHost, serverNames, Some(progress))
             val result = coord.fromAll("status")
             coord.close
             val report = result map {
@@ -338,7 +342,7 @@ case class CommandHandler(factory: ActorRefFactory, localHost: String, servicesI
           val version = args(1)
           // TODO check version is legal??
           findServers match {
-            case Some((serviceName, stackName, serverNames)) =>
+            case Some((serviceName, groupName, stackName, serverNames)) =>
               val (hasLB, select) = getStack(serviceName, stackName) match {
                 case Some(j) =>
                   (jgetBoolean(j, "lb"),
@@ -346,7 +350,7 @@ case class CommandHandler(factory: ActorRefFactory, localHost: String, servicesI
                 case None => (false, Seq[String]())
               }
               println("")
-              val coord = Coordinator(factory, serviceName, localHost, serverNames, Some(progress))
+              val coord = Coordinator(factory, serviceName, groupName, localHost, serverNames, Some(progress))
               coord.deploy(serviceName, version, select, hasLB)
               coord.close
               println("")
@@ -357,9 +361,9 @@ case class CommandHandler(factory: ActorRefFactory, localHost: String, servicesI
         }
       } else if (cmd == "halt") {
         findServers match {
-          case Some((serviceName, stackName, serverNames)) =>
+          case Some((serviceName, groupName, stackName, serverNames)) =>
             println("")
-            val coord = Coordinator(factory, serviceName, localHost, serverNames, Some(progress))
+            val coord = Coordinator(factory, serviceName, groupName, localHost, serverNames, Some(progress))
             coord.halt()
             coord.close
             println("")
@@ -367,9 +371,9 @@ case class CommandHandler(factory: ActorRefFactory, localHost: String, servicesI
         }
       } else if (cmd == "bounce") {
         findServers match {
-          case Some((serviceName, stackName, serverNames)) =>
+          case Some((serviceName, groupName, stackName, serverNames)) =>
             println("")
-            val coord = Coordinator(factory, serviceName, localHost, serverNames, Some(progress))
+            val coord = Coordinator(factory, serviceName, groupName, localHost, serverNames, Some(progress))
             coord.bounce()
             coord.close
             println("")

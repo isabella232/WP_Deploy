@@ -7,7 +7,7 @@ import com.whitepages.serviceDeploy.deploy.Requests._
 import scala.concurrent.duration._
 import scala.language.postfixOps
 
-class Coordinator(factory: ActorRefFactory, serviceName: String, localHost: String, hosts: Seq[String], progress: Option[Progress => Unit]) {
+class Coordinator(factory: ActorRefFactory, serviceName: String, groupName:String, localHost: String, hosts: Seq[String], progress: Option[Progress => Unit]) {
   private[this] implicit val ec: ExecutionContext = factory.dispatcher
 
   //println("CO="+localHost)
@@ -15,7 +15,7 @@ class Coordinator(factory: ActorRefFactory, serviceName: String, localHost: Stri
   val hostMap = (hosts map {
     case host: String =>
       val host1 = if (host == "*") localHost else host
-      val serverRef = factory.actorOf(Props(classOf[AgentClient], serviceName, host1, null, progress))
+      val serverRef = factory.actorOf(Props(classOf[AgentClient], serviceName, groupName, host1, null, progress))
       (host1, serverRef)
   }).toMap
 
@@ -158,8 +158,8 @@ class Coordinator(factory: ActorRefFactory, serviceName: String, localHost: Stri
 
 object Coordinator {
   // TODO reuse if same hosts
-  def apply(factory: ActorRefFactory, serviceName: String, localHost: String, hosts: Seq[String], progress: Option[Progress => Unit] = None) =
-    new Coordinator(factory, serviceName, localHost, hosts, progress)
+  def apply(factory: ActorRefFactory, serviceName: String, groupName:String, localHost: String, hosts: Seq[String], progress: Option[Progress => Unit] = None) =
+    new Coordinator(factory, serviceName, groupName,localHost, hosts, progress)
 }
 
 

@@ -2,25 +2,26 @@ package com.whitepages.serviceDeploy.cmdHandler
 
 case class CommandState(info: ServicesInfo) {
   var service: Option[String] = None
+  var group: Option[String] = None
   var stack: Option[String] = None
   var server: Option[String] = None
 
-  def findService: Option[String] = {
-    service match {
-      case Some(serviceName) =>
-        Some(serviceName)
-      case None =>
+  def findService: Option[(String,String)] = {
+    (service, group) match {
+      case (Some(serviceName),Some(groupName)) =>
+        Some(serviceName,groupName)
+      case x:Any =>
         println("no service specified")
         None
     }
   }
 
-  def findStack: Option[(String, String)] = {
+  def findStack: Option[(String, String, String)] = {
     findService match {
-      case Some(serviceName) =>
+      case Some((serviceName,groupName)) =>
         stack match {
           case Some(stackName) =>
-            Some((serviceName, stackName))
+            Some((serviceName, groupName, stackName))
           case None =>
             println("no stack specified")
             None
@@ -31,7 +32,7 @@ case class CommandState(info: ServicesInfo) {
 
   def findServer: Option[(String, String, String)] = {
     findStack match {
-      case Some((serviceName, stackName)) =>
+      case Some((serviceName, groupName, stackName)) =>
         server match {
           case Some(serverName) =>
             Some((serviceName, stackName, serverName))
@@ -43,16 +44,16 @@ case class CommandState(info: ServicesInfo) {
     }
   }
 
-  def findServers: Option[(String, String, Seq[String])] = {
+  def findServers: Option[(String, String, String, Seq[String])] = {
     findStack match {
-      case Some((serviceName, stackName)) =>
+      case Some((serviceName, groupName, stackName)) =>
         server match {
           case Some(serverName) =>
-            Some((serviceName, stackName, Seq(serverName)))
+            Some((serviceName, groupName, stackName, Seq(serverName)))
           case None =>
             info.getServers(serviceName, stackName) match {
               case Some(servers: Seq[String]) =>
-                Some((serviceName, stackName, servers))
+                Some((serviceName, groupName, stackName, servers))
               case None =>
                 println("stack not specified")
                 None

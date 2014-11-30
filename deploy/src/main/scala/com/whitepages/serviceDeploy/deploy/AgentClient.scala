@@ -10,7 +10,7 @@ import scala.language.postfixOps
 import scala.util.Random
 
 
-class AgentClient(serviceName: String, host: String, multi: ActorRef, progress: Option[(Progress) => Unit]) extends Actor {
+class AgentClient(serviceName: String, groupName:String, host: String, multi: ActorRef, progress: Option[(Progress) => Unit]) extends Actor {
   //("agent=" + s"akka.tcp://service-agent@$host:8991/user/agent")
   private[this] implicit val ec: ExecutionContext = context.dispatcher
   private[this] val agent = context.actorSelection(s"akka.tcp://service-agent@$host:8991/user/agent")
@@ -52,7 +52,8 @@ class AgentClient(serviceName: String, host: String, multi: ActorRef, progress: 
       //expectCmd = cmd
       expectId = nextId
       expectP = Some(p)
-      val r = JsonObject("id" -> expectId, "cmd" -> cmd, "request" -> request, "service" -> serviceName, "user" -> user)
+      val r = JsonObject("id" -> expectId, "cmd" -> cmd, "request" -> request,
+        "service" -> serviceName, "group"->groupName, "user" -> user)
       agent ! Compact(r)
       timerExpectId = expectId
       timer = Some(context.system.scheduler.scheduleOnce(10 seconds) {
