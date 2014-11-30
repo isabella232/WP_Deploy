@@ -12,7 +12,7 @@ dockerSettings
 
 serviceClass := "com.whitepages.sampleApp.SampleMain"
 
-servicePort := 8900
+servicePort := 8888
 
 maintainer := "you@foo.com"
 

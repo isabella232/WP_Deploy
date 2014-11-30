@@ -60,10 +60,12 @@ case class CommandHandler(factory: ActorRefFactory, localHost: String, servicesI
 
   def setCompleters {
     //lazy val versions = getVersions()
+    var old:Completer = null
     reader.getCompleters foreach {
       case completer =>
-        reader.removeCompleter(completer)
+        old = completer
     }
+    reader.removeCompleter(old)
     var completers = new util.LinkedList[Completer]()
     completers.add(new StringsCompleter("help"))
     completers.add(new StringsCompleter("quit"))
