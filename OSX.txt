@@ -1,0 +1,142 @@
+This software is used to deploy Scala services to Docker containers.
+Code is somewhat rough and still under development.
+
+The following steps will set up a demo on OSX.
+Some simpifications.
+
+   The deploy machine is a local instance in a vm created via boot2docker.
+   There is only one stack and one server in that stack.
+   There is only a single service.
+   No docker repo is used, instead only the local image cache is used.
+
+Most of the folowing steps are initial setup. Once setup,
+typically the only steps needed are 7 (build docker image)
+and 10 (deploy).
+
+
+1. IP Address
+
+   Make sure you have a non 127.0.0.1 ip address
+   (This may require you be on wifi).
+   Make sure your hostname points to that ip.
+   If not set your host name to that ip.
+
+       sudo scutil --set HostName "a.b.c.d"
+
+2. Make sure you have java 1.7
+
+   java -version
+
+3. Install boot2docker for osx 1.3.2
+
+    https://github.com/boot2docker/osx-installer/releases
+
+       boot2docker init
+       boot2docker up
+    
+    run the listed export commands
+
+    note the ip address for the virtual box vm typically 192.168.59.103 port 2376
+    docker commnd should now be available
+
+    Now you need to disable ssl
+
+       boot2docker ssh
+
+          sudo su -
+          cat > /var/lib/boot2docker/profile
+          DOCKER_TLS=no
+          ^D
+
+    Exit the vm and then 
+
+       boot2docker stop
+       boot2docker start
+
+    Again run the listed export commands
+
+4. Build docker base image
+
+    in WP_Deploy/base
+
+       ./buildBase
+
+    check this worked with
+
+       docker images 
+
+5. Build docker sbt plugin.
+
+    in WP_Deploy/docker
+
+       sbt publish-local
+
+6. Build scala framework (used by sample app and agent)
+
+    in WP_Scala_Framework
+
+       sbt publish-local
+
+7. Build docker image for sample application
+
+    in WP_Deploy/sample
+
+       sbt docker
+
+    check this worked with
+
+       docker images
+
+8. Override the agent config
+
+   Copy
+
+       WP_Deploy/agenet/override/service-agent.conf 
+  
+   to directory 
+
+       ~/.wpscala
+
+   Edit this file
+
+        akka.remote.netty.tcp.hostname 
+
+     should be the local ip (from step 1)
+
+        wp.service-agent.containerHost
+        wp.clients.docker.host
+     
+     should both be the ip of the docker vm (from step 3)
+
+        wp.clients.docker.port
+
+     should be the docker port (from step 3)
+   
+9. Run the agent
+
+    in WP_Deploy/agent 
+
+       sbt run
+
+10. Run the command handler
+
+   in WP_Deploy/deploy
+
+       sbt run -local
+
+    You should see a deploy> prompt, type the following
+
+       help
+       services
+       service sample-app
+       stacks
+       stack local
+       status
+       versions
+       deploy 0.0.3
+       status
+       quit
+
+   You can see the service is running with the following command
+
+       curl http://192.168.59.103:8888/admin:info?opt:pretty
