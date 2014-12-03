@@ -12,7 +12,7 @@ object Deploy {
   def main(args: Array[String]): Unit = {
     try {
       main0(args)
-      System.exit(0)
+      //System.exit(0)
     } catch {
       case ex: Throwable =>
         println("")

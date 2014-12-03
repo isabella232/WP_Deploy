@@ -1,5 +1,8 @@
 package com.whitepages.cmdb.graph
 
+import com.whitepages.framework.client.HttpClient.{JsonBody, Request}
+import com.whitepages.framework.client.{HttpClient, Client}
+import com.whitepages.framework.logging.noId
 import org.joda.time.format.ISODateTimeFormat
 import org.joda.time.DateTime
 import scala.concurrent.Future
@@ -8,7 +11,7 @@ import akka.actor.{ActorRef, ActorRefFactory}
 import java.util.UUID
 import com.whitepages.cmdb.util.Order
 import com.whitepages.framework.util.{ClassSupport, Util}
-import com.whitepages.framework.client.Neo4jClient
+//import com.whitepages.framework.client.Neo4jClient
 
 case class Neo4jUtil(actorFactory: ActorRefFactory) extends ClassSupport {
 
@@ -16,14 +19,24 @@ case class Neo4jUtil(actorFactory: ActorRefFactory) extends ClassSupport {
 
   def now = logFmt.print(DateTime.now())
 
-  private[this] val client = Neo4jClient(actorFactory, "neo4j")
+  //private[this] val client = Neo4jClient(actorFactory, "neo4j")
+  private[this] val client = HttpClient(actorFactory, "neo4j", Request("/ping"))
 
   private[this] implicit val ec = system.dispatcher
 
   def cypher(query: String): Future[Json] = {
     def request = JsonObject("query" -> query)
     //println(Pretty(request))
-    client.postJson("db/data/cypher", request)
+    //client.postJson("db/data/cypher", request)
+    val req = Request("/db/data/cypher",body = Some(JsonBody(request)) ,method="post")
+    val rf = client.callHttp(req,noId)
+    rf map {
+      case r =>
+        r.body match {
+          case Some(j:JsonBody) => j.body
+          case x:Any => emptyJsonObject
+        }
+    }
   }
 
   private def item(n: String, v: String) = {

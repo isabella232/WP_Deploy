@@ -1,3 +1,4 @@
+/*
 package com.whitepages.framework.client
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -92,3 +93,4 @@ case class Neo4jClient(actorFactory: ActorRefFactory, clientName: String) extend
   }
 
 }
+*/
