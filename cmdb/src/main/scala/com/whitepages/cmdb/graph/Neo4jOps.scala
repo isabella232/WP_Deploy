@@ -173,7 +173,7 @@ case class Neo4jOps(val util: Neo4jUtil) extends ClassSupport {
     val f3 = cypherMatch(compound + cypherLeft("ServiceClusters") + cypherNode("Service", "service"), Seq("service"))
     Future.sequence(Seq(f, f1, f2, f3)) map {
       case Seq(response, response1, response2, response3) =>
-        println(Pretty(response))
+        //println(Pretty(response))
         val a = jgetArray(response, "data")
         val a1 = jgetArray(response1, "data")
         val a2 = jgetArray(response2, "data")
@@ -304,9 +304,9 @@ case class Neo4jOps(val util: Neo4jUtil) extends ClassSupport {
     val f = createNode(name, t0, "Deployment")
     val f1 = f flatMap {
       case d =>
-        println(Pretty(d))
+        //println(Pretty(d))
         val id = jgetString(d, "data", 0, 0, "data", "id")
-        println("cid=" + id)
+        //println("cid=" + id)
         val f1 = createRelationship(clusterId, "Cluster", "Deployments", id, "Deployment")
         val f2 = createRelationship(id, "Deployment", "DeployedFrom", versionId, "Version")
         val f3 = createRelationship(id, "Deployment", "DeployedBy", personId, "Person")

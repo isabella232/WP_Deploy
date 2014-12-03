@@ -22,7 +22,7 @@ case class Neo4jUtil(actorFactory: ActorRefFactory) extends ClassSupport {
 
   def cypher(query: String): Future[Json] = {
     def request = JsonObject("query" -> query)
-    println(Pretty(request))
+    //println(Pretty(request))
     client.postJson("db/data/cypher", request)
   }
 
