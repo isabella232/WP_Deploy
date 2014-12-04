@@ -50,7 +50,7 @@ case class DockerClient(service: String, factory: ActorRefFactory) extends Class
             throw ClientFailException(JsonObject("client" -> service, "msg" -> "no body", "url" -> url))
         }
     }
-    val x = Await.result(f, 30 seconds)
+    val x = Await.result(f, 3 minutes)
     x
   }
 

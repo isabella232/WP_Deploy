@@ -69,6 +69,12 @@ class LifecycleClient(svcHost: String) extends ActorSupport {
       case p => p.trySuccess(result)
     }
     runp = None
+    timerId += 1
+    if (timer != None) {
+      timer foreach {
+        case t => t.cancel()
+      }
+    }
     timer = None
     reportProgress = None
   }
