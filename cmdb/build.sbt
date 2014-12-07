@@ -17,7 +17,7 @@ libraryDependencies ++=Seq(
   "com.vaadin" % "vaadin-server" % "7.1.9",
   "com.vaadin" % "vaadin-client-compiled" % "7.1.9",
   "com.vaadin" % "vaadin-themes" % "7.1.9",
-  "com.whitepages" %% "scala-webservice" % "9.4.3"
+  "com.whitepages" %% "scala-webservice" % "9.4.10-SNAPSHOT"
   //"com.whitepages" % "scala-test_2.10" % "7.0.1" % "test"
 )
 

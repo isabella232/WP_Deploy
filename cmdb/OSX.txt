@@ -1,0 +1,34 @@
+This is a mock up of a central controller for
+provisiong and deployment. Data is stored in the
+neo4j graph database. The deploy command is a mock and
+does not do an actual deployment; instead it just updates
+the database to record the deployment.
+
+To run on OSX.
+
+1. Make sure Java 7 is installed.
+
+2. Download the community edition of neo4j.
+
+3. Run
+
+   bin/neo4j start
+
+4. In WP_Deploy/cmdb
+
+   sbt run
+
+5. To load the database
+
+    curl http://127.0.0.1:8000/load-reload
+
+6. ^c the run in step 4.
+
+7. In WP_Deploy/cmdb
+
+    sbt container:start
+
+8. In a web browser goto 
+
+      127.0.0.1:8080
+ 
