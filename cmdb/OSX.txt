@@ -1,6 +1,8 @@
 This is a mock up of a central controller for
 provisiong and deployment. Data is stored in the
-neo4j graph database. The deploy command is a mock and
+neo4j graph database. The UI is built using Vaadin.
+
+The deploy command is a mock and
 does not do an actual deployment; instead it just updates
 the database to record the deployment.
 
