@@ -67,7 +67,7 @@ and 10 (deploy).
 
 5. Build docker sbt plugin.
 
-    in WP_Deploy/docker
+    in WP_Deploy/plugin
 
        sbt publish-local
 
@@ -91,11 +91,11 @@ and 10 (deploy).
 
    Copy
 
-       WP_Deploy/agenet/override/service-agent.conf 
+       WP_Deploy/agent/override/service-agent.conf
   
    to directory 
 
-       ~/.wpscala
+       ~/.wpscala/
 
    Edit this file
 
