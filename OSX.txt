@@ -73,7 +73,7 @@ and 10 (deploy).
 
 6. Build scala framework (used by sample app and agent)
 
-    in WP_Scala_Framework
+    in WP_Scala_Framework (in each of the logging and framework subdirectories)
 
        sbt publish-local
 
