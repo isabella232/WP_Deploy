@@ -16,7 +16,10 @@ object Deploy {
     } catch {
       case ex: Throwable =>
         println("")
-        println(s"${Console.RED}Deploy failed: ${ex.getMessage}${Console.BLACK}")
+        println(Console.RED)
+        println(s"Deploy failed: ${ex.getMessage}")
+        ex.printStackTrace()
+        println(Console.BLACK)
         println("")
         System.exit(1)
     }
@@ -60,21 +63,20 @@ object Deploy {
     }
     // Hack to filter out vbox ip
     val all2 = all1 filter {
-      case ip => !ip.startsWith("192.")
-
+      case ip => !ip.startsWith("192.168.59.3")
     }
     val ip = all2.head
     println("ip= " + ip)
 
     val local = options.containsKey("local")
-    val servicesInfo = ServicesInfo(ip, local)
+    val pc = options.containsKey("pc")
 
     val conf = ConfigFactory.load()
     var hostConfig: ConfigValue = ConfigValueFactory.fromAnyRef(ip, "local host")
     val conf1 = ConfigFactory.load().withValue("akka.remote.netty.tcp.hostname", hostConfig)
     val system = ActorSystem("deploy", conf1)
 
-    val commandHandler = CommandHandler(system, ip, servicesInfo)
+    val commandHandler = CommandHandler(system, ip, local, pc, ip)
     if (cmds.isEmpty) {
       commandHandler.run()
 

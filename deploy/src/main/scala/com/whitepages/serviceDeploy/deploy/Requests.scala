@@ -9,6 +9,4 @@ object Requests {
 
   case class AgentTimer(id: Long)
 
-  case class Progress(host:String, msg:String, level:String = "info")
-
 }

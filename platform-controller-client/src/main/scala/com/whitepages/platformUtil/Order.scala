@@ -1,4 +1,4 @@
-package com.whitepages.serviceDeploy.cmdHandler
+package com.whitepages.platformUtil
 
 import com.persist.JsonOps._
 

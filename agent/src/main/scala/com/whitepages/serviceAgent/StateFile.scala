@@ -11,10 +11,24 @@ import com.whitepages.framework.logging.noId
 
 object StateFile extends ClassSupport {
 
+  //private[this] val fileName = "/opt/wp/service-agent/agent.json"
   private[this] val fileName = config.getString("wp.service-agent.stateFile")
   private[this] val f = File(fileName)
 
-  private def read(reportProgress:Option[(Progress)=>Unit]= None): JsonObject = {
+  def set(serviceName: String, value: Json, reportProgress: Option[(Progress) => Unit] = None) {
+    val old = read(reportProgress)
+    val n = old + (serviceName -> value)
+    write(n, reportProgress)
+  }
+
+  def clear(serviceName: String, reportProgress: Option[(Progress) => Unit] = None) {
+    val old = read(reportProgress)
+    val n = old - serviceName
+    //log.error(noId, JsonObject("old" -> old, "new" -> n, "name" -> serviceName))
+    write(n, reportProgress)
+  }
+
+  def read(reportProgress: Option[(Progress) => Unit] = None): JsonObject = {
     if (f.exists) {
       val text = try {
         val ftext = FileIO.read(fileName)
@@ -46,7 +60,7 @@ object StateFile extends ClassSupport {
     }
   }
 
-  private def write(v: JsonObject, reportProgress:Option[(Progress)=>Unit]=None) {
+  private def write(v: JsonObject, reportProgress: Option[(Progress) => Unit] = None) {
     try {
 
       val f = FileIO.write(fileName, Pretty(v) + "\n")
@@ -62,25 +76,12 @@ object StateFile extends ClassSupport {
     }
   }
 
-  def set(serviceName: String, value: Json, reportProgress:Option[(Progress)=>Unit]= None) {
-    val old = read(reportProgress)
-    val n = old + (serviceName -> value)
-    write(n, reportProgress)
-  }
-
-  def clear(serviceName: String, reportProgress:Option[(Progress)=>Unit]= None) {
-    val old = read(reportProgress)
-    val n = old - serviceName
-    //log.error(noId, JsonObject("old" -> old, "new" -> n, "name" -> serviceName))
-    write(n, reportProgress)
-  }
-
   def get(serviceName: String): Json = {
     val old = read()
     jget(old, serviceName)
   }
 
-  def getFirst(reportProgress:Option[(Progress)=>Unit]= None): (String, Json) = {
+  def getFirst(reportProgress: Option[(Progress) => Unit] = None): (String, Json) = {
     val old = read(reportProgress)
     old.toSeq.headOption match {
       case Some((n, v)) => (n, v)

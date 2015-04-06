@@ -1,15 +1,16 @@
-package com.whitepages.serviceDeploy.deploy
+package com.whitepages.platformController.coordinator
 
-import akka.actor.{PoisonPill, ActorRef, Props, ActorRefFactory}
-import scala.concurrent.{Await, Future, Promise, ExecutionContext}
+import akka.actor.{ActorRef, ActorRefFactory, PoisonPill, Props}
 import com.persist.JsonOps._
-import com.whitepages.serviceDeploy.deploy.Requests._
+import com.whitepages.framework.logging.RequestId
+import com.whitepages.platformController.client.AgentClient
 import scala.concurrent.duration._
+import scala.concurrent.{Await, ExecutionContext, Future, Promise}
 import scala.language.postfixOps
-import com.whitepages.platformControllerClient.ControllerClient.Progress
+import com.whitepages.platformController.client.AgentRequests._
 
-class Coordinator(factory: ActorRefFactory, serviceName: String, groupName:String, envName:String,
-                  localHost: String, hosts: Seq[String], progress: Option[Progress => Unit]) {
+class Coordinator(id: RequestId, factory: ActorRefFactory, serviceName: String, groupName: String, envName: String,
+                  subName: String, localHost: String, hosts: Seq[String], user: String, progress: Option[Progress => Unit]) {
   private[this] implicit val ec: ExecutionContext = factory.dispatcher
 
   //println("CO="+localHost)
@@ -17,7 +18,7 @@ class Coordinator(factory: ActorRefFactory, serviceName: String, groupName:Strin
   val hostMap = (hosts map {
     case host: String =>
       val host1 = if (host == "*") localHost else host
-      val serverRef = factory.actorOf(Props(classOf[AgentClient], serviceName, groupName, envName, host1, null, progress))
+      val serverRef = factory.actorOf(Props(classOf[AgentClient], serviceName, groupName, envName, subName, host1, null, progress))
       (host1, serverRef)
   }).toMap
 
@@ -25,7 +26,7 @@ class Coordinator(factory: ActorRefFactory, serviceName: String, groupName:Strin
     val ps = hostMap.toSeq map {
       case (host, ref) =>
         val p = Promise[JsonObject]()
-        ref ! AgentRequest(cmd, emptyJsonObject, p)
+        ref ! AgentRequest(id, cmd, emptyJsonObject, user, p)
         p.future map {
           case result => (host, result)
         }
@@ -42,7 +43,7 @@ class Coordinator(factory: ActorRefFactory, serviceName: String, groupName:Strin
   def fromFirst(cmd: String): JsonObject = {
     val (host, ref) = hostMap.head
     val p = Promise[JsonObject]()
-    ref ! AgentRequest(cmd, emptyJsonObject, p)
+    ref ! AgentRequest(id, cmd, emptyJsonObject, user, p)
     val p1 = p.future map {
       case result => JsonObject(host -> result)
     }
@@ -54,7 +55,7 @@ class Coordinator(factory: ActorRefFactory, serviceName: String, groupName:Strin
       val (host, ref) = map.head
       val map1 = map.tail
       val p = Promise[JsonObject]()
-      ref ! AgentRequest("download", JsonObject("version" -> version), p)
+      ref ! AgentRequest(id, "download", JsonObject("version" -> version), user, p)
       val x = p.future flatMap {
         case result =>
           progress foreach {
@@ -79,12 +80,14 @@ class Coordinator(factory: ActorRefFactory, serviceName: String, groupName:Strin
   }
 
 
-  private def deployOrdered(map: Map[String, ActorRef], serviceName: String, version: String, select: Seq[String], hasLB: Boolean, domain: String): Future[Unit] = {
+  private def deployOrdered(map: Map[String, ActorRef], serviceName: String, version: String, select: Seq[String],
+                            hasLB: Boolean, domain: String): Future[Unit] = {
     if (map.size > 0) {
       val (host, ref) = map.head
       val map1 = map.tail
       val p = Promise[JsonObject]()
-      ref ! AgentRequest("deploy", JsonObject("version" -> version, "select" -> select, "hasLB" -> hasLB, "domain" -> domain), p)
+      ref ! AgentRequest(id, "deploy", JsonObject("version" -> version, "select" -> select,
+        "hasLB" -> hasLB, "domain" -> domain), user, p)
       p.future flatMap {
         case result =>
           progress foreach {
@@ -110,45 +113,11 @@ class Coordinator(factory: ActorRefFactory, serviceName: String, groupName:Strin
     Await.result(f1, 10 minutes)
   }
 
-  def provision(serviceName: String, envName: String, provider: String, region: String, zone: String, instanceType: String, numToProvision: Int, loadBalancerPort: Int, domain: String): JsonObject = {
-    val (host, ref) = hostMap.head
-    val p = Promise[JsonObject]()
-    val request = AgentRequest("provision",
-      JsonObject("serviceName" -> serviceName,
-                 "envName" -> envName,
-                 "provider" -> provider,
-                 "region" -> region,
-                 "zone" -> zone,
-                 "instanceType" -> instanceType,
-                 "domain" -> domain,
-                 "count" -> numToProvision,
-                 "loadBalancerPort" -> loadBalancerPort), p)
-    progress map((p) => p(Progress(host, s"Sending provision request to agent: $request")))
-    ref ! request
-    Await.result(p.future, 10 minutes)
-  }
-
-  def provisionServers(serviceName: String, envName: String, provider: String, region: String, zone: String, instanceType: String, numToProvision: Int): JsonObject = {
-    val (host, ref) = hostMap.head
-    val p = Promise[JsonObject]()
-    val request = AgentRequest("provisionServers",
-      JsonObject("serviceName" -> serviceName,
-                 "envName" -> envName,
-                 "provider" -> provider,
-                 "region" -> region,
-                 "zone" -> zone,
-                 "instanceType" -> instanceType,
-                 "count" -> numToProvision), p)
-    progress map((p) => p(Progress(host, s"Sending provision request to agent: $request")))
-    ref ! request
-    Await.result(p.future, 10 minutes)
-  }
-
   def halt() {
     val ps = hostMap.toSeq map {
       case (host, ref) =>
         val p = Promise[JsonObject]()
-        ref ! AgentRequest("halt", emptyJsonObject, p)
+        ref ! AgentRequest(id, "halt", emptyJsonObject, user, p)
         p.future
     }
     val fs: Future[Seq[JsonObject]] = Future.sequence(ps)
@@ -160,7 +129,7 @@ class Coordinator(factory: ActorRefFactory, serviceName: String, groupName:Strin
       val (host, ref) = map.head
       val map1 = map.tail
       val p = Promise[JsonObject]()
-      ref ! AgentRequest("bounce", emptyJsonObject, p)
+      ref ! AgentRequest(id, "bounce", emptyJsonObject, user, p)
       p.future map {
         case result =>
           progress foreach {
@@ -194,8 +163,9 @@ class Coordinator(factory: ActorRefFactory, serviceName: String, groupName:Strin
 
 object Coordinator {
   // TODO reuse if same hosts
-  def apply(factory: ActorRefFactory, serviceName: String, groupName:String, envName:String, localHost: String, hosts: Seq[String], progress: Option[Progress => Unit] = None) =
-    new Coordinator(factory, serviceName, groupName,envName, localHost, hosts, progress)
+  def apply(id: RequestId, factory: ActorRefFactory, serviceName: String, groupName: String, envName: String,
+            subName: String, localHost: String, hosts: Seq[String], user: String, progress: Option[Progress => Unit] = None) =
+    new Coordinator(id, factory, serviceName, groupName, envName, subName, localHost, hosts, user, progress)
 }
 
 

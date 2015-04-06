@@ -1,26 +1,25 @@
-package com.whitepages.serviceDeploy.deploy
+package com.whitepages.platformController.client
 
-import com.persist.JsonOps._
 import akka.actor._
-import com.whitepages.platformControllerClient.ControllerClient.Progress
-import scala.concurrent.{ExecutionContext, Promise}
-import Requests._
+import com.persist.JsonOps._
+import com.whitepages.framework.logging.RequestId
+import com.whitepages.framework.util.ActorSupport
 import scala.concurrent.duration._
+import scala.concurrent.{ExecutionContext, Promise}
 import scala.language.postfixOps
-
 import scala.util.Random
+import AgentRequests._
 
 
-class AgentClient(serviceName: String, groupName:String, envName:String, host: String, multi: ActorRef, progress: Option[(Progress) => Unit]) extends Actor {
+class AgentClient(serviceName: String, groupName:String, envName:String, subName:String, host: String, multi: ActorRef, progress: Option[(Progress) => Unit]) extends ActorSupport {
   //("agent=" + s"akka.tcp://service-agent@$host:8991/user/agent")
   private[this] implicit val ec: ExecutionContext = context.dispatcher
   private[this] val agent = context.actorSelection(s"akka.tcp://service-agent@$host:8991/user/agent")
-  //private[this] var expectCmd: String = ""
   private[this] var expectId: Long = 0L
   private[this] var expectP: Option[Promise[JsonObject]] = None
   private[this] var timer: Option[Cancellable] = None
   private[this] var timerExpectId: Long = 0L
-  private[this] val user = System.getProperty("user.name")
+  //private[this] val user = System.getProperty("user.name")
 
   private[this] var seed: Long = 0L
 
@@ -49,12 +48,16 @@ class AgentClient(serviceName: String, groupName:String, envName:String, host: S
   }
 
   def receive = {
-    case AgentRequest(cmd: String, request: JsonObject, p: Promise[JsonObject]) =>
+    case AgentRequest(id:RequestId, cmd: String, request: JsonObject, user:String, p: Promise[JsonObject]) =>
       //expectCmd = cmd
       expectId = nextId
       expectP = Some(p)
+      val spanId = Random.nextLong().toHexString
+
       val r = JsonObject("id" -> expectId, "cmd" -> cmd, "request" -> request,
-        "service" -> serviceName, "group"->groupName, "env"->envName, "user" -> user)
+        "service" -> serviceName, "group"->groupName, "env"->envName, "sub"->subName, "user" -> user,
+        "trackingId" -> id.trackingId, "spanId" -> spanId)
+      //log.warn(noId, r)
       agent ! Compact(r)
       timerExpectId = expectId
       timer = Some(context.system.scheduler.scheduleOnce(10 seconds) {
@@ -67,6 +70,7 @@ class AgentClient(serviceName: String, groupName:String, envName:String, host: S
       }
     case s: String =>
       val j = jgetObject(Json(s))
+      //log.error(noId, j)
       val cmd = jgetString(j, "cmd")
       val id = jgetLong(j, "id")
       val response = jgetObject(j, "response")
@@ -76,7 +80,7 @@ class AgentClient(serviceName: String, groupName:String, envName:String, host: S
           if (cmd == "warmPercent") {
             // for now, don't report percents
             val percent = jgetInt(response, "percent")
-            // report(s"warmup percent: $percent")
+            report(s"warmup percent: $percent")
           } else {
             val level = jgetString(response, "level")
             if (level != "") {

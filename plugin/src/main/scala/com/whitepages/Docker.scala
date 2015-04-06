@@ -2,13 +2,16 @@ package com.whitepages
 
 import sbt._
 import sbt.Keys._
-import java.io.{PrintWriter, File}
+import java.io.PrintWriter
 import sbt.File
 import org.apache.commons.io.FileUtils
-import sbtassembly.Plugin._
-import AssemblyKeys._
+import sbtassembly.AssemblyKeys._
 
 object Docker extends Plugin {
+
+  val dockerLocalOverride = SettingKey[Boolean]("dockerLocalOverride", "use local DockerFile")
+
+  val dockerLocalOverrideDefault = dockerLocalOverride := false
 
   val dockerRepo = SettingKey[String]("dockerRepo", "repo for docker images")
 
@@ -16,7 +19,7 @@ object Docker extends Plugin {
 
   val dockerBase = SettingKey[String]("dockerBase", "base repo for docker images")
 
-  val dockerBaseDefault = dockerBase := "base/scala-base:1.0.0"
+  val dockerBaseDefault = dockerBase := "platform/scala-base:1.0.0"
 
   val serviceClass = SettingKey[String]("serviceClass", "top level service class")
 
@@ -42,46 +45,54 @@ object Docker extends Plugin {
 
   val dockerPushDefault = dockerPush := true
 
-  val doDocker = SettingKey[Boolean]("doDocker", "Release will push image to docker repo")
+  val dockerExtraPorts = SettingKey[Seq[Int]]("dockerExtraPorts", "extra ports to expose")
 
-  val doDockerDefault = doDocker := false
-
-  val doJar = SettingKey[Boolean]("doJar", "Release will push jars to artifactory")
-
-  val doJarDefault = doJar := true
+  val dockerExtraPortsDefault = dockerExtraPorts := Seq[Int]()
 
   val dockerGenTask = dockerGen := {
-    // depends on assembly task
     assembly.value
     val v = version.value
     val n = name.value
     val sc = serviceClass.value
     val p = servicePort.value
-    val opt = dockerJavaOptions.value
     val base = dockerBase.value
     val main = maintainer.value
     val dr = dockerRepo.value
     val p1 = p + 30000
+    val pJMX = p + 10000
     val scalaVer = scalaVersion.value
     val scalaVer2 = scalaVer.split("[.]").take(2).mkString(".")
     val f0: File = new File("target/docker")
     f0.delete()
     val f1: File = new File("target/docker/files")
     f1.mkdir()
-    FileUtils.copyFileToDirectory(new File(s"target/scala-$scalaVer2/$n-assembly-$v.jar"), f1)
+    FileUtils.copyFileToDirectory(new File(s"target/scala-$scalaVer2/$n.jar"), f1)
     val f: File = new File("target/docker/Dockerfile")
-    val out = new PrintWriter(f)
-    out.println(s"FROM $dr/$base")
-    out.println(s"MAINTAINER $main")
-    out.println(s"COPY files /opt/wp/$n")
-    out.println(s"WORKDIR /opt/wp/$n")
-    out.println(s"EXPOSE $p")
-    out.println(s"EXPOSE $p1")
-    val opts = Seq("java", "-cp", s"$n-assembly-$v.jar") ++ opt ++ Seq("com.whitepages.framework.service.DockerRunner", s"$sc")
-    val fopt = opts.mkString("[\"", "\",\"", "\"]")
-    out.println(s"CMD $fopt")
-    out.close
-    println("Generated " + f.getPath)
+    if (dockerLocalOverride.value) {
+      val local = new File("DockerLocal/Dockerfile")
+      sbt.IO.copy(Seq((local,f)),overwrite = true)
+    } else {
+      val out = new PrintWriter(f)
+      out.println(s"FROM $dr/$base")
+      out.println(s"MAINTAINER $main")
+      out.println(s"COPY files /opt/wp/$n")
+      out.println(s"WORKDIR /opt/wp/$n")
+      out.println(s"EXPOSE $p")
+      out.println(s"EXPOSE $p1")
+      out.println(s"EXPOSE $pJMX")
+      for (port <- dockerExtraPorts.value) {
+        out.println(s"EXPOSE $port")
+      }
+      val enableRemoteJMX = Seq("-Dcom.sun.management.jmxremote.authenticate=false", "-Dcom.sun.management.jmxremote.ssl=false",
+        "-Dcom.sun.management.jmxremote", s"-Dcom.sun.management.jmxremote.port=$pJMX")
+      val javaHeapDumpSettings = Seq("-XX:+HeapDumpOnOutOfMemoryError", "-XX:HeapDumpPath=/tmp") //TODO: mount a filestyem from CoreOS that is durable
+      val opt = javaHeapDumpSettings ++ enableRemoteJMX ++ dockerJavaOptions.value
+      val opts = Seq("java", "-cp", s"$n.jar") ++ opt ++ Seq("com.whitepages.framework.service.DockerRunner", s"$sc")
+      val fopt = opts.mkString("[\"", "\",\"", "\"]")
+      out.println(s"CMD $fopt")
+      out.close()
+      println("Generated " + f.getPath)
+    }
   }
 
   // invoke from release if doDocker
@@ -104,7 +115,8 @@ object Docker extends Plugin {
 
   lazy val dockerSettings: Seq[Def.Setting[_]] =
     Seq(dockerGenTask, dockerTask, serviceClassDefault, servicePortDefault,
-      dockerGroupDefault, dockerJavaOptionsDefault, dockerPushDefault, dockerBaseDefault)
+      dockerGroupDefault, dockerJavaOptionsDefault, dockerPushDefault, dockerBaseDefault,
+    dockerLocalOverrideDefault, dockerExtraPortsDefault)
 
 }
 

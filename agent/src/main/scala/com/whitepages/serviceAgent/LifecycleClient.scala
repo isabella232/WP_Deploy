@@ -1,18 +1,25 @@
 package com.whitepages.serviceAgent
 
-import com.whitepages.framework.util.ActorSupport
-import akka.actor.{Cancellable, ActorSelection}
-import scala.concurrent.{ExecutionContext, Promise}
+import akka.actor.{ActorSelection, Cancellable, Props}
 import com.persist.JsonOps._
 import com.whitepages.framework.logging.noId
-import Requests._
-import scala.concurrent.duration._
+import com.whitepages.framework.util.{ActorSupport, CheckedActor}
+import com.whitepages.platformCommon.loadBalancer.balancer.LoadBalancerProviderException
+import com.whitepages.serviceAgent.Requests._
+
+import scala.concurrent.duration.{FiniteDuration, _}
+import scala.concurrent.{ExecutionContext, Promise}
 import scala.language.postfixOps
 
-import scala.concurrent.duration.FiniteDuration
 
-class LifecycleClient(svcHost: String) extends ActorSupport {
-  private[this] implicit val ex:ExecutionContext = context.dispatcher
+object LifecycleClient {
+  def getProps(svcHost: String, loadBalancerOpt: Option[LoadBalancer]) =
+    Props(classOf[LifecycleClient], svcHost, loadBalancerOpt)
+}
+
+
+class LifecycleClient(svcHost: String, loadBalancerOpt: Option[LoadBalancer]) extends CheckedActor with ActorSupport {
+  private[this] implicit val ex: ExecutionContext = context.dispatcher
 
   private[this] val waitRunning = getFiniteDuration("wp.service-agent.waitRunning")
   private[this] val waitWarming = getFiniteDuration("wp.service-agent.waitWarming")
@@ -79,9 +86,9 @@ class LifecycleClient(svcHost: String) extends ActorSupport {
     reportProgress = None
   }
 
-  def receive = {
+  def rec = {
 
-    case LcTimer(expect, id) if (id == timerId) =>
+    case LcTimer(expect, id) if id == timerId =>
       timer foreach {
         case t => t.cancel()
       }
@@ -91,13 +98,15 @@ class LifecycleClient(svcHost: String) extends ActorSupport {
     case LcInit(hasLB0, svcPort0) =>
       if (svcPort != svcPort0) {
         svcPort = svcPort0
-        serviceActor = Some(context.actorSelection(s"akka.tcp://lifecycle@$svcHost:$svcPort/user/lifecycle"))
+        val path = s"akka.tcp://lifecycle@$svcHost:$svcPort/user/lifecycle"
+        serviceActor = Some(context.actorSelection(path))
+        log.error(noId, path + ":" + serviceActor.toString)
       }
       hasLB = hasLB0
 
     case LcRun(p, reportProgress0, iname0, select0) =>
       //     running
-      // => init
+      // => init     (starts spray server and application; can take a while)
       //     warming
       //     warmed
       // => onlb
@@ -109,8 +118,9 @@ class LifecycleClient(svcHost: String) extends ActorSupport {
       expect("running", waitRunning, start = true)
 
     case LcStop(p, reportProgress0, iname0) =>
+      // =>  stop
       //     stopping
-      // => offlb
+      // =>  offlb
       //     draining
       //     drained
       //     stopped
@@ -123,7 +133,7 @@ class LifecycleClient(svcHost: String) extends ActorSupport {
 
 
     case s: String =>
-      //log.info(noId,JsonObject("serviceActor"->sender.path.toString))
+      log.info(noId, JsonObject("serviceActor" -> sender.path.toString))
       val msg = Json(s)
       val cmd = jgetString(msg, "cmd")
       state = cmd
@@ -139,6 +149,7 @@ class LifecycleClient(svcHost: String) extends ActorSupport {
           val request = JsonObject("configSelect" -> select)
           expect("warming", waitWarming)
           serviceActor map (_ ! ServiceMessage("init", Some(request)))
+          log.info(noId, JsonObject("msg" -> msg, "waitWarming" -> waitWarming.toString()))
         case "warming" =>
           // 125 seconds = 2 mins + 5 secs
           val to = jgetInt(msg, "timeout")
@@ -151,18 +162,37 @@ class LifecycleClient(svcHost: String) extends ActorSupport {
           expect("up", waitUp)
           if (hasLB) {
             progress("enabling lb")
-            LoadBalancer.enable(reportProgress)
+            try {
+              loadBalancerOpt match { // TODO: unify with hasLb?
+                case Some(lb) => lb.enableNode(serviceActor, ServiceMessage("onlb"))
+                case None => log.error(noId, "Load balancer not set!")
+              }
+            } catch {
+              case lbpe: LoadBalancerProviderException =>
+                val msg = "Error while enabling host"
+                log.error(noId, JsonObject("msg" -> msg), lbpe)
+                reportProgress.foreach(p => p(Progress(msg, level = "error")))
+            }
           }
-          serviceActor map (_ ! ServiceMessage("onlb"))
         case "up" =>
           done(LcResult())
         case "stopping" =>
           expect("draining", waitDraining)
           if (hasLB) {
             progress("disabling lb")
-            LoadBalancer.disable(reportProgress)
+            try {
+              loadBalancerOpt match { // TODO: unify with hasLb?
+                case Some(lb) => lb.disableNode(serviceActor, ServiceMessage("offlb"))
+                case None => log.error(noId, "Load balancer not set!")
+              }
+            }
+            catch {
+              case lbpe: LoadBalancerProviderException =>
+                val msg = "Error while disabling host"
+                log.error(noId, JsonObject("msg" -> msg), lbpe)
+                reportProgress.foreach(p => p(Progress(msg, level = "error")))
+            }
           }
-          serviceActor map (_ ! ServiceMessage("offlb"))
         case "draining" =>
           expect("drained", waitDrained)
         case "drained" =>
